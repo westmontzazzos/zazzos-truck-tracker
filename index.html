@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Truck Tracker">
+  <title>Zazzo's Truck Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{background:#EFEFEF;color:#111;font-family:'Inter',system-ui,sans-serif;font-size:14px;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+    .H{position:relative;background:#C8102E;border-bottom:4px solid #1B6B3A;display:flex;align-items:center;flex-wrap:wrap;padding:10px 12px;gap:6px;row-gap:8px;z-index:200;}
+    .H-logo{font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:0.04em;}
+    .H-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+    .B{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:6px;font-family:'Inter',system-ui,sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+    .B:active{opacity:0.75;}
+    .B-ghost{background:transparent;border-color:rgba(255,255,255,0.5);color:#fff;}
+    .B-outline{background:#fff;border-color:#E2E2E2;color:#111;}
+    .B-red{background:#C8102E;border-color:#C8102E;color:#fff;}
+    .B-lg{height:44px;padding:0 20px;font-size:14px;}
+    .B[disabled]{opacity:0.4;cursor:default;}
+
+    /* LOGIN / HOME */
+    .Login{min-height:100vh;background:#EFEFEF;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:36px;}
+    .Login-logo{font-family:'Libre Baskerville',Georgia,serif;font-size:48px;font-weight:700;color:#C8102E;line-height:1;text-align:center;}
+    .Login-tag{margin-top:10px;font-size:11px;font-weight:700;color:#777;letter-spacing:0.2em;text-transform:uppercase;text-align:center;}
+    .Login-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;max-width:420px;}
+    .LCard{background:#fff;border:2px solid #1B6B3A;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px 12px;min-height:130px;transition:border-color 0.15s,box-shadow 0.15s,transform 0.15s;user-select:none;-webkit-tap-highlight-color:transparent;text-align:center;}
+    .LCard:active{transform:translateY(1px);}
+    .LCard-emoji{font-size:28px;}
+    .LCard-role{font-family:'Libre Baskerville',Georgia,serif;font-size:17px;font-weight:700;color:#111;}
+    .LCard-sub{font-size:11px;font-weight:600;font-style:italic;color:#C8102E;}
+    .MenuTile{background:#fff;border:2px solid #1B6B3A;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;display:flex;align-items:center;gap:16px;padding:20px;transition:border-color 0.15s,box-shadow 0.15s,transform 0.15s;user-select:none;-webkit-tap-highlight-color:transparent;}
+    .MenuTile:active{transform:translateY(1px);}
+    .MenuTile.primary{border-color:#C8102E;background:#FFF8F8;}
+    .MenuTile-emoji{font-size:30px;flex-shrink:0;width:40px;text-align:center;}
+    .MenuTile-title{font-family:'Libre Baskerville',Georgia,serif;font-size:18px;font-weight:700;color:#111;}
+    .MenuTile-sub{font-size:11px;font-weight:600;font-style:italic;color:#C8102E;margin-top:2px;}
+
+    /* PAGE */
+    .Page{padding:12px 16px 100px;}
+    .SectionLabel{font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:0.06em;margin:18px 0 8px;}
+    .SectionLabel:first-child{margin-top:0;}
+
+    /* FORM BLOCK */
+    .Block{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08),0 0 0 1px rgba(0,0,0,0.04);margin-bottom:12px;padding:16px;}
+    .Block-title{font-family:'Libre Baskerville',Georgia,serif;font-size:15px;font-weight:700;color:#111;margin-bottom:10px;}
+    .Field{margin-bottom:14px;}
+    .Field:last-child{margin-bottom:0;}
+    .Field label{display:block;font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;}
+    .Field select,.Field input[type=text],.Field input[type=date],.Field input[type=number],.Field textarea{
+      width:100%;min-height:44px;border:2px solid #E2E2E2;border-radius:8px;padding:0 12px;font-family:'Inter',system-ui,sans-serif;font-size:15px;color:#111;background:#fff;-webkit-appearance:none;appearance:none;}
+    .Field textarea{padding:10px 12px;min-height:70px;font-family:'Inter',system-ui,sans-serif;resize:vertical;}
+    .Field select:focus,.Field input:focus,.Field textarea:focus{outline:none;border-color:#C8102E;}
+    .Field-hint{font-size:11px;color:#999;margin-top:4px;}
+
+    /* Yes/No toggle pairs */
+    .YN{display:flex;gap:8px;}
+    .YN-btn{flex:1;height:44px;border-radius:8px;border:2px solid #E2E2E2;background:#fff;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:700;color:#111;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .YN-btn.sel-yes{background:#FDECEA;border-color:#C8102E;color:#C8102E;}
+    .YN-btn.sel-no{background:#E8F5ED;border-color:#1B6B3A;color:#1B6B3A;}
+
+    .RadioGrid{display:flex;flex-direction:column;gap:8px;}
+    .RadioRow{display:flex;align-items:center;gap:10px;border:2px solid #E2E2E2;border-radius:8px;padding:11px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .RadioRow.sel{border-color:#C8102E;background:#FFF8F8;}
+    .RadioRow-dot{width:18px;height:18px;border-radius:50%;border:2px solid #ccc;flex-shrink:0;position:relative;}
+    .RadioRow.sel .RadioRow-dot{border-color:#C8102E;}
+    .RadioRow.sel .RadioRow-dot::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#C8102E;}
+    .RadioRow-label{font-size:14px;font-weight:600;color:#111;}
+
+    .Check{display:flex;align-items:flex-start;gap:10px;border:2px solid #E2E2E2;border-radius:8px;padding:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .Check.sel{border-color:#1B6B3A;background:#F0F7F2;}
+    .Check-box{width:20px;height:20px;border-radius:5px;border:2px solid #ccc;flex-shrink:0;margin-top:1px;position:relative;}
+    .Check.sel .Check-box{border-color:#1B6B3A;background:#1B6B3A;}
+    .Check.sel .Check-box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;}
+    .Check-label{font-size:13px;font-weight:600;color:#111;line-height:1.4;}
+
+    /* FOOTER */
+    .Footer{position:fixed;bottom:0;left:0;right:0;min-height:60px;background:#C8102E;border-top:4px solid #1B6B3A;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;row-gap:6px;padding:8px 12px;z-index:150;}
+    .Footer-prog{font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);text-align:center;flex:1;padding:0 8px;}
+    .Fbtn{height:38px;padding:0 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid rgba(255,255,255,0.5);background:transparent;color:#fff;white-space:nowrap;-webkit-tap-highlight-color:transparent;font-family:'Inter',system-ui,sans-serif;}
+    .Fbtn:active{background:rgba(255,255,255,0.15);}
+    .Fbtn-next{background:#fff;color:#C8102E;border-color:#fff;}
+    .Fbtn[disabled]{opacity:0.4;cursor:default;}
+
+    /* OVERLAY / MODAL */
+    .Overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;overflow-y:auto;}
+    .Modal{background:#fff;border-radius:12px;padding:26px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.22);max-height:90vh;overflow-y:auto;}
+    .Modal-title{font-family:'Libre Baskerville',Georgia,serif;font-size:18px;font-weight:700;color:#111;margin-bottom:8px;}
+    .Modal-body{font-size:13px;color:#444;line-height:1.65;margin-bottom:18px;}
+    .Modal-body ul{margin:10px 0 0 18px;}
+    .Modal-body li{margin-bottom:6px;}
+    .Modal-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+
+    .Success{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;gap:16px;text-align:center;}
+    .Success-emoji{font-size:56px;}
+    .Success-title{font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;}
+    .Success-sub{font-size:13px;color:#777;}
+
+    .Loading{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;}
+    .ErrText{font-size:12px;color:#C8102E;font-weight:600;margin-top:6px;}
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://wkzhmfyfxlfkkqevzxvf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_B1EXocVYT57f5fpvVLONZA_YZx5trib';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE = 'truck_checks';
+
+// Major.Minor — bump the FIRST number for a new feature, the SECOND for a
+// cosmetic/minor change (this is intentionally the reverse of typical semver).
+const APP_VERSION = '1.0';
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const LOCATIONS = {
+  westmont: { name:'Westmont', emoji:'🍳' },
+  darien:   { name:'Darien',   emoji:'📦' },
+};
+
+const DRIVERS = {
+  westmont: ['AJ','Alex D','Andrew','Casandra D','Greg','Hector','Jeff Zeggebeen','Jeff Pietras','Joliet Mike','Julie','Justin D','Mike G','Oscar D','Rhett','Rick'],
+  darien:   ['Bill','Dan','Duga','Emily N','Josh','Kris','Laura','Paul','Todd','Tony','Manuel'],
+};
+
+// Placeholder truck numbers — edit this object directly to add/remove trucks.
+const TRUCKS = {
+  westmont: ['1','2','3'],
+  darien:   ['1','2'],
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let activeLoc = null;      // 'westmont' | 'darien'
+let checkType = null;      // 'checkout' | 'return'
+let setup = { driver:'', date:'', truck:'' };
+let gasRun = null;         // null (not yet chosen) | true | false
+let form = {};             // all checklist field values
+let acknowledged = false;
+const app = document.getElementById('app');
+
+function todayStr(){
+  const d=new Date();
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+showHome();
+
+function showLoading(){ app.innerHTML = `<div class="Loading">Loading…</div>`; }
+
+// ─── HOME ────────────────────────────────────────────────────────────────────
+function showHome(){
+  activeLoc=null; checkType=null; setup={driver:'',date:'',truck:''}; gasRun=null; form={}; acknowledged=false;
+  app.innerHTML = `
+    <div class="Login">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#999;text-align:center;letter-spacing:0.1em;margin-bottom:4px;">v${APP_VERSION}</div>
+        <div class="Login-logo">Zazzo's</div>
+        <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;text-align:center;margin-top:4px;">Truck Tracker</div>
+        <div class="Login-tag">Westmont · Darien</div>
+      </div>
+      <div class="Login-grid">
+        ${Object.entries(LOCATIONS).map(([lk,l])=>`
+          <div class="LCard" data-lk="${lk}">
+            <div class="LCard-emoji">${l.emoji}</div>
+            <div class="LCard-role">${l.name}</div>
+            <div class="LCard-sub">Select location</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  document.querySelectorAll('.LCard[data-lk]').forEach(el=>{
+    el.onclick=()=>{ activeLoc=el.dataset.lk; showCheckTypeMenu(); };
+  });
+}
+
+// ─── CHECKOUT / RETURN MENU ──────────────────────────────────────────────────
+function showCheckTypeMenu(){
+  const loc = LOCATIONS[activeLoc];
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bHome">🏠 Home</button></div>
+    </header>
+    <div class="Page" style="padding-top:20px;display:flex;flex-direction:column;gap:14px;">
+      <div class="MenuTile primary" id="bCheckout">
+        <div class="MenuTile-emoji">🚚</div>
+        <div><div class="MenuTile-title">Checkout Truck</div><div class="MenuTile-sub">Starting your shift</div></div>
+      </div>
+      <div class="MenuTile" id="bReturn">
+        <div class="MenuTile-emoji">🔁</div>
+        <div><div class="MenuTile-title">Return Truck</div><div class="MenuTile-sub">Ending your shift</div></div>
+      </div>
+    </div>`;
+  document.getElementById('bHome').onclick=showHome;
+  document.getElementById('bCheckout').onclick=()=>{ checkType='checkout'; showSetup(); };
+  document.getElementById('bReturn').onclick=()=>{ checkType='return'; showSetup(); };
+}
+
+// ─── SETUP (driver / date / truck) ───────────────────────────────────────────
+function showSetup(){
+  const loc = LOCATIONS[activeLoc];
+  const drivers = DRIVERS[activeLoc];
+  const trucks = TRUCKS[activeLoc];
+  setup.date = setup.date || todayStr();
+
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      <div class="Block">
+        <div class="Block-title">${checkType==='checkout'?'Checkout Truck':'Return Truck'}</div>
+        <div class="Field">
+          <label>Driver</label>
+          <select id="fDriver">
+            <option value="">Select driver…</option>
+            ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="Field">
+          <label>Date</label>
+          <input type="date" id="fDate" value="${setup.date}">
+        </div>
+        <div class="Field">
+          <label>Truck Number</label>
+          <select id="fTruck">
+            <option value="">Select truck…</option>
+            ${trucks.map(t=>`<option value="${t}" ${setup.truck===t?'selected':''}>Truck ${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="Footer">
+      <div class="Footer-prog">Step 1 of 2</div>
+      <button class="Fbtn Fbtn-next" id="bContinue">Continue →</button>
+    </div>`;
+
+  document.getElementById('bBack').onclick=showCheckTypeMenu;
+  document.getElementById('bContinue').onclick=()=>{
+    setup.driver=document.getElementById('fDriver').value;
+    setup.date=document.getElementById('fDate').value;
+    setup.truck=document.getElementById('fTruck').value;
+    if(!setup.driver || !setup.date || !setup.truck){
+      showModal('Missing info','Please select a driver, date, and truck number before continuing.',[
+        {l:'OK',c:'B-red',fn:closeModal},
+      ]);
+      return;
+    }
+    if(checkType==='checkout' && !acknowledged){
+      showAcknowledgment();
+    } else {
+      showGasRunQuestion();
+    }
+  };
+}
+
+// ─── ACKNOWLEDGMENT (checkout only, shown once per session) ─────────────────
+function showAcknowledgment(){
+  showModal('Truck Assignment Acknowledgment',
+    `By continuing, I acknowledge that I am responsible for:
+    <ul>
+      <li>Recording accurate mileage at checkout and return</li>
+      <li>Ensuring the fuel tank is at least 3/4 full — if it's below 1/4, filling up using the company credit card before returning</li>
+      <li>Keeping the heater on while the truck is in use, and confirming it's off when returned</li>
+      <li>Parking the truck back where I found it, unless a manager has instructed otherwise</li>
+    </ul>`,
+    [
+      {l:'Cancel',c:'B-outline',fn:closeModal},
+      {l:'I Acknowledge',c:'B-red',fn:()=>{ acknowledged=true; closeModal(); showGasRunQuestion(); }},
+    ], true);
+}
+
+// ─── GAS RUN QUESTION (checkout only — bypasses full checklist) ─────────────
+function showGasRunQuestion(){
+  if(checkType!=='checkout'){ showChecklist(); return; }
+  const loc = LOCATIONS[activeLoc];
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      <div class="Block">
+        <div class="Block-title">Is this just a gas run?</div>
+        <div class="Field-hint" style="margin-bottom:12px;">If you're only taking the truck to refuel, choose Yes — you'll just log start/end mileage.</div>
+        <div class="YN">
+          <button class="YN-btn" id="bGasYes">Yes — Gas run only</button>
+          <button class="YN-btn" id="bGasNo">No — Full checkout</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('bBack').onclick=showSetup;
+  document.getElementById('bGasYes').onclick=()=>{ gasRun=true; showGasRunForm(); };
+  document.getElementById('bGasNo').onclick=()=>{ gasRun=false; showChecklist(); };
+}
+
+function showGasRunForm(){
+  const loc = LOCATIONS[activeLoc];
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      <div class="Block">
+        <div class="Block-title">Gas Run — ${setup.truck?`Truck ${setup.truck}`:''}</div>
+        <div class="Field">
+          <label>Starting Mileage</label>
+          <input type="number" id="fMileageStart" placeholder="e.g. 84210" value="${form.mileageStart||''}">
+        </div>
+        <div class="Field">
+          <label>Ending Mileage</label>
+          <input type="number" id="fMileageEnd" placeholder="e.g. 84225" value="${form.mileageEnd||''}">
+        </div>
+        <div class="Check sel" style="pointer-events:none;">
+          <div class="Check-box"></div>
+          <div class="Check-label">I confirm I drove this truck only to refuel it.</div>
+        </div>
+      </div>
+    </div>
+    <div class="Footer">
+      <div class="Footer-prog"></div>
+      <button class="Fbtn Fbtn-next" id="bSubmit">Submit ✓</button>
+    </div>`;
+  document.getElementById('bBack').onclick=showGasRunQuestion;
+  document.getElementById('bSubmit').onclick=async ()=>{
+    form.mileageStart=document.getElementById('fMileageStart').value;
+    form.mileageEnd=document.getElementById('fMileageEnd').value;
+    if(!form.mileageStart || !form.mileageEnd){
+      showModal('Missing info','Please enter both starting and ending mileage.',[{l:'OK',c:'B-red',fn:closeModal}]);
+      return;
+    }
+    await submitRecord({ gas_run:true });
+  };
+}
+
+// ─── MAIN CHECKLIST (checkout full, or return) ──────────────────────────────
+function showChecklist(){
+  const loc = LOCATIONS[activeLoc];
+  const isCheckout = checkType==='checkout';
+
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+
+      <div class="SectionLabel">${isCheckout?'Checkout':'Return'} — Truck ${setup.truck} · ${setup.driver}</div>
+
+      <div class="Block">
+        <div class="Field">
+          <label>Mileage</label>
+          <input type="number" id="fMileage" placeholder="e.g. 84210" value="${form.mileage||''}">
+        </div>
+      </div>
+
+      ${isCheckout ? `
+      <div class="Block">
+        <div class="Block-title">Warmers</div>
+        <div class="Field">
+          <label>Are the warmers on in the back of the truck?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="warmersOn" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="warmersOn" data-val="no">No</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="Block">
+        <div class="Block-title">Fuel Level</div>
+        <div class="RadioGrid" id="fuelGrid">
+          ${['3/4 full or more','About 1/2 full','More than 1/4 full','Less than 1/4 full'].map(opt=>`
+            <div class="RadioRow" data-fuel="${opt}">
+              <div class="RadioRow-dot"></div>
+              <div class="RadioRow-label">${opt}</div>
+            </div>`).join('')}
+        </div>
+        <div id="ccWrap" style="display:none;margin-top:12px;">
+          <div class="Check" id="ccUsed" data-check="creditCardUsed">
+            <div class="Check-box"></div>
+            <div class="Check-label">I filled the tank using the company credit card before completing this checkout.</div>
+          </div>
+        </div>
+      </div>
+      ` : `
+      <div class="Block">
+        <div class="Block-title">Garbage / Items</div>
+        <div class="Field">
+          <label>Is the truck free of garbage and left-behind items?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="noGarbage" data-val="yes">Yes — clean</button>
+            <button class="YN-btn" data-yn="noGarbage" data-val="no">No — items left</button>
+          </div>
+        </div>
+        <div class="Field" id="garbageDetailWrap" style="display:none;">
+          <label>List what was left in the truck</label>
+          <textarea id="fGarbageReturn" placeholder="e.g. empty cups, food wrappers…">${form.garbageReturnNotes||''}</textarea>
+        </div>
+      </div>
+
+      <div class="Block">
+        <div class="Block-title">Heater</div>
+        <div class="Field">
+          <label>Confirm the heater has been turned off</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="heaterOff" data-val="yes">Confirmed off</button>
+            <button class="YN-btn" data-yn="heaterOff" data-val="no">Still on</button>
+          </div>
+        </div>
+      </div>
+      `}
+
+      ${isCheckout ? `
+      <div class="Block">
+        <div class="Block-title">Garbage / Items Left in Truck</div>
+        <div class="Field">
+          <label>List any garbage or items found in the truck (leave blank if none)</label>
+          <textarea id="fGarbage" placeholder="e.g. none / empty cups on floor">${form.garbageNotes||''}</textarea>
+        </div>
+      </div>
+      ` : ``}
+
+      <div class="Block">
+        <div class="Block-title">Walk-Around Inspection</div>
+        <div class="Field">
+          <label>Any visible damage to the truck?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="damage" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="damage" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="Field" id="damageDetailWrap" style="display:none;">
+          <label>Describe the damage</label>
+          <textarea id="fDamageNotes" placeholder="Location and description of damage">${form.damageNotes||''}</textarea>
+        </div>
+      </div>
+
+      <div class="Block">
+        <div class="Block-title">Equipment</div>
+        <div class="Field">
+          <label>Push cart in truck?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="pushCart" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="pushCart" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="Field">
+          <label>Shelves in truck${isCheckout?' / heater':''}?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="shelves" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="shelves" data-val="no">No</button>
+          </div>
+        </div>
+      </div>
+
+      ${!isCheckout ? `
+      <div class="Block">
+        <div class="Block-title">Parking</div>
+        <div class="Field">
+          <label>Was the truck parked at the back end of the street (where you found it)?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="parkedCorrectly" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="parkedCorrectly" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="Field" id="parkExceptionWrap" style="display:none;">
+          <label>Which manager approved a different parking spot?</label>
+          <input type="text" id="fParkManager" placeholder="Manager's name" value="${form.parkManager||''}">
+        </div>
+      </div>
+      ` : ``}
+
+    </div>
+    <div class="Footer">
+      <div class="Footer-prog" id="progText"></div>
+      <button class="Fbtn Fbtn-next" id="bSubmit">Submit ✓</button>
+    </div>`;
+
+  document.getElementById('bBack').onclick=()=>{
+    if(isCheckout) showGasRunQuestion(); else showSetup();
+  };
+
+  // wire up YN buttons
+  document.querySelectorAll('[data-yn]').forEach(btn=>{
+    const key=btn.dataset.yn, val=btn.dataset.val;
+    if(form[key]===val) btn.classList.add(val==='yes'?'sel-yes':'sel-no');
+    btn.onclick=()=>{
+      form[key]=val;
+      document.querySelectorAll(`[data-yn="${key}"]`).forEach(b=>{ b.classList.remove('sel-yes','sel-no'); });
+      btn.classList.add(val==='yes'?'sel-yes':'sel-no');
+      // conditional reveals
+      if(key==='damage'){ document.getElementById('damageDetailWrap').style.display = val==='yes' ? 'block' : 'none'; }
+      if(key==='noGarbage'){ document.getElementById('garbageDetailWrap').style.display = val==='no' ? 'block' : 'none'; }
+      if(key==='parkedCorrectly'){ document.getElementById('parkExceptionWrap').style.display = val==='no' ? 'block' : 'none'; }
+      updateProgress();
+    };
+  });
+
+  // fuel level radios (checkout only)
+  const fuelGrid=document.getElementById('fuelGrid');
+  if(fuelGrid){
+    fuelGrid.querySelectorAll('[data-fuel]').forEach(row=>{
+      const opt=row.dataset.fuel;
+      if(form.fuelLevel===opt) row.classList.add('sel');
+      row.onclick=()=>{
+        form.fuelLevel=opt;
+        fuelGrid.querySelectorAll('.RadioRow').forEach(r=>r.classList.remove('sel'));
+        row.classList.add('sel');
+        document.getElementById('ccWrap').style.display = opt==='Less than 1/4 full' ? 'block' : 'none';
+        updateProgress();
+      };
+    });
+    if(form.fuelLevel==='Less than 1/4 full') document.getElementById('ccWrap').style.display='block';
+  }
+
+  const ccUsed=document.getElementById('ccUsed');
+  if(ccUsed){
+    if(form.creditCardUsed) ccUsed.classList.add('sel');
+    ccUsed.onclick=()=>{ form.creditCardUsed=!form.creditCardUsed; ccUsed.classList.toggle('sel'); updateProgress(); };
+  }
+
+  if(form.damage==='yes') document.getElementById('damageDetailWrap').style.display='block';
+  if(form.noGarbage==='no') document.getElementById('garbageDetailWrap') && (document.getElementById('garbageDetailWrap').style.display='block');
+  if(form.parkedCorrectly==='no') document.getElementById('parkExceptionWrap') && (document.getElementById('parkExceptionWrap').style.display='block');
+
+  document.getElementById('fMileage').oninput=e=>{ form.mileage=e.target.value; };
+  const fGarbage=document.getElementById('fGarbage'); if(fGarbage) fGarbage.oninput=e=>{ form.garbageNotes=e.target.value; };
+  const fGarbageReturn=document.getElementById('fGarbageReturn'); if(fGarbageReturn) fGarbageReturn.oninput=e=>{ form.garbageReturnNotes=e.target.value; };
+  const fDamageNotes=document.getElementById('fDamageNotes'); if(fDamageNotes) fDamageNotes.oninput=e=>{ form.damageNotes=e.target.value; };
+  const fParkManager=document.getElementById('fParkManager'); if(fParkManager) fParkManager.oninput=e=>{ form.parkManager=e.target.value; };
+
+  updateProgress();
+
+  document.getElementById('bSubmit').onclick=async ()=>{
+    const missing = validateChecklist(isCheckout);
+    if(missing.length){
+      showModal('Missing info', 'Please complete: '+missing.join(', ')+'.', [{l:'OK',c:'B-red',fn:closeModal}]);
+      return;
+    }
+    await submitRecord({ gas_run:false });
+  };
+}
+
+function requiredFields(isCheckout){
+  const req = ['mileage','damage','pushCart','shelves'];
+  if(isCheckout){ req.push('warmersOn','fuelLevel'); }
+  else { req.push('noGarbage','heaterOff','parkedCorrectly'); }
+  return req;
+}
+
+function validateChecklist(isCheckout){
+  const labels = {
+    mileage:'Mileage', damage:'Damage inspection', pushCart:'Push cart', shelves:'Shelves',
+    warmersOn:'Warmers', fuelLevel:'Fuel level',
+    noGarbage:'Garbage check', heaterOff:'Heater confirmation', parkedCorrectly:'Parking confirmation',
+  };
+  const missing=[];
+  requiredFields(isCheckout).forEach(f=>{ if(!form[f]) missing.push(labels[f]); });
+  if(isCheckout && form.fuelLevel==='Less than 1/4 full' && !form.creditCardUsed) missing.push('Credit card fill-up confirmation');
+  if(form.damage==='yes' && !form.damageNotes) missing.push('Damage description');
+  if(!isCheckout && form.noGarbage==='no' && !form.garbageReturnNotes) missing.push('Garbage/items description');
+  if(!isCheckout && form.parkedCorrectly==='no' && !form.parkManager) missing.push('Manager name for parking exception');
+  return missing;
+}
+
+function updateProgress(){
+  const isCheckout = checkType==='checkout';
+  const req = requiredFields(isCheckout);
+  const done = req.filter(f=>form[f]).length;
+  const el=document.getElementById('progText');
+  if(el) el.textContent = `${done}/${req.length} complete`;
+}
+
+// ─── SUBMIT ──────────────────────────────────────────────────────────────────
+async function submitRecord(extra){
+  showLoading();
+  const record = {
+    location: activeLoc,
+    check_type: checkType,
+    driver_name: setup.driver,
+    truck_number: setup.truck,
+    check_date: setup.date,
+    acknowledged: checkType==='checkout' ? acknowledged : null,
+    ...extra,
+    ...(extra.gas_run ? {
+      mileage_start: form.mileageStart ? Number(form.mileageStart) : null,
+      mileage_end: form.mileageEnd ? Number(form.mileageEnd) : null,
+    } : {
+      mileage: form.mileage ? Number(form.mileage) : null,
+      warmers_on: form.warmersOn ? form.warmersOn==='yes' : null,
+      fuel_level: form.fuelLevel || null,
+      credit_card_used: !!form.creditCardUsed,
+      garbage_notes: form.garbageNotes || form.garbageReturnNotes || null,
+      no_garbage_confirmed: form.noGarbage ? form.noGarbage==='yes' : null,
+      heater_off_confirmed: form.heaterOff ? form.heaterOff==='yes' : null,
+      damage_found: form.damage ? form.damage==='yes' : null,
+      damage_notes: form.damageNotes || null,
+      push_cart: form.pushCart ? form.pushCart==='yes' : null,
+      shelves: form.shelves ? form.shelves==='yes' : null,
+      parked_correctly: form.parkedCorrectly ? form.parkedCorrectly==='yes' : null,
+      parking_exception_manager: form.parkManager || null,
+    }),
+  };
+
+  try{
+    const { error } = await sb.from(TABLE).insert(record);
+    if(error) throw error;
+    showSuccess();
+  }catch(e){
+    showModal('Save failed', 'This record could not be saved: '+(e.message||'unknown error')+'. Please try again.', [{l:'OK',c:'B-red',fn:()=>{ closeModal(); showChecklist(); }}]);
+  }
+}
+
+function showSuccess(){
+  app.innerHTML = `
+    <div class="Success">
+      <div class="Success-emoji">✅</div>
+      <div class="Success-title">${checkType==='checkout'?'Checkout':'Return'} Submitted</div>
+      <div class="Success-sub">Truck ${setup.truck} · ${setup.driver} · ${setup.date}</div>
+      <button class="B B-red B-lg" id="bDone" style="margin-top:12px;">Done</button>
+    </div>`;
+  document.getElementById('bDone').onclick=showHome;
+}
+
+// ─── MODAL HELPER ────────────────────────────────────────────────────────────
+function showModal(title, body, actions, wide){
+  const overlay=document.createElement('div');
+  overlay.className='Overlay';
+  overlay.innerHTML=`
+    <div class="Modal" style="${wide?'max-width:460px;':''}">
+      <div class="Modal-title">${title}</div>
+      <div class="Modal-body">${body}</div>
+      <div class="Modal-actions">
+        ${actions.map((a,i)=>`<button class="B ${a.c}" data-act="${i}">${a.l}</button>`).join('')}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  actions.forEach((a,i)=>{
+    overlay.querySelector(`[data-act="${i}"]`).onclick=a.fn;
+  });
+}
+function closeModal(){
+  const o=document.querySelector('.Overlay');
+  if(o) o.remove();
+}
+</script>
+</body>
+</html>
