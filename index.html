@@ -254,18 +254,40 @@ async function showSetup(){
   const drivers = DRIVERS[activeLoc];
   const allTrucks = TRUCKS[activeLoc];
   setup.date = setup.date || todayStr();
+  const isReturn = checkType==='return';
 
   let trucks = allTrucks;
-  let outNote = '';
-  if(checkType==='return'){
+  if(isReturn){
     showLoading();
     const outTrucks = await getOutTrucks(activeLoc);
-    if(outTrucks && outTrucks.length){
-      trucks = allTrucks.filter(t=>outTrucks.includes(t));
-    } else {
-      outNote = `<div class="Field-hint" style="color:#C8102E;">No trucks currently show as checked out — showing the full list.</div>`;
-    }
+    trucks = outTrucks || [];
   }
+
+  const truckField = `
+    <div class="Field">
+      <label>Truck Number</label>
+      <select id="fTruck" ${trucks.length===0?'disabled':''}>
+        ${trucks.length===0
+          ? `<option value="">No trucks currently checked out</option>`
+          : `<option value="">Select truck…</option>` + trucks.map(t=>`<option value="${t}" ${setup.truck===t?'selected':''}>Truck ${t}</option>`).join('')
+        }
+      </select>
+    </div>`;
+
+  const driverField = `
+    <div class="Field">
+      <label>Driver</label>
+      <select id="fDriver">
+        <option value="">Select driver…</option>
+        ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
+      </select>
+    </div>`;
+
+  const dateField = `
+    <div class="Field">
+      <label>Date</label>
+      <input type="date" id="fDate" value="${setup.date}">
+    </div>`;
 
   app.innerHTML = `
     <header class="H">
@@ -275,30 +297,12 @@ async function showSetup(){
     <div class="Page" style="padding-top:16px;">
       <div class="Block">
         <div class="Block-title">${checkType==='checkout'?'Checkout Truck':'Return Truck'}</div>
-        <div class="Field">
-          <label>Driver</label>
-          <select id="fDriver">
-            <option value="">Select driver…</option>
-            ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
-          </select>
-        </div>
-        <div class="Field">
-          <label>Date</label>
-          <input type="date" id="fDate" value="${setup.date}">
-        </div>
-        <div class="Field">
-          <label>Truck Number</label>
-          <select id="fTruck">
-            <option value="">Select truck…</option>
-            ${trucks.map(t=>`<option value="${t}" ${setup.truck===t?'selected':''}>Truck ${t}</option>`).join('')}
-          </select>
-          ${outNote}
-        </div>
+        ${isReturn ? truckField + driverField + dateField : driverField + dateField + truckField}
       </div>
     </div>
     <div class="Footer">
       <div class="Footer-prog">Step 1 of 2</div>
-      <button class="Fbtn Fbtn-next" id="bContinue">Continue →</button>
+      <button class="Fbtn Fbtn-next" id="bContinue" ${trucks.length===0?'disabled':''}>Continue →</button>
     </div>`;
 
   document.getElementById('bBack').onclick=showCheckTypeMenu;
