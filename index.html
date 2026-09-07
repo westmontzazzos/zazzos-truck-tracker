@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -181,7 +181,7 @@ function showHome(){
           </div>`).join('')}
       </div>
       ${testMode ? `<div style="font-size:11px;font-weight:700;color:#C8102E;text-align:center;">🧪 TEST MODE ON — nothing will save</div>` : ``}
-      <div id="testTrigger" style="font-size:11px;color:#ccc;padding:14px;user-select:none;-webkit-tap-highlight-color:transparent;">T</div>
+      <div id="testTrigger" style="width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid #1B6B3A;color:#1B6B3A;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:6px auto 0;user-select:none;-webkit-tap-highlight-color:transparent;box-shadow:0 1px 4px rgba(0,0,0,0.1);">T</div>
     </div>`;
   document.querySelectorAll('.LCard[data-lk]').forEach(el=>{
     el.onclick=()=>{ activeLoc=el.dataset.lk; showCheckTypeMenu(); };
