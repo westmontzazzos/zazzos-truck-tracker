@@ -117,7 +117,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '1.2';
+const APP_VERSION = '2.0';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -143,6 +143,9 @@ let setup = { driver:'', date:'', truck:'' };
 let gasRun = null;         // null (not yet chosen) | true | false
 let form = {};             // all checklist field values
 let acknowledged = false;
+let testMode = false;      // when true, submissions are NOT saved to Supabase
+let testTapCount = 0;
+let testTapTimer = null;
 const app = document.getElementById('app');
 
 function todayStr(){
@@ -175,10 +178,26 @@ function showHome(){
             <div class="LCard-sub">Select location</div>
           </div>`).join('')}
       </div>
+      ${testMode ? `<div style="font-size:11px;font-weight:700;color:#C8102E;text-align:center;">🧪 TEST MODE ON — nothing will save</div>` : ``}
+      <div id="testTrigger" style="font-size:11px;color:#ccc;padding:14px;user-select:none;-webkit-tap-highlight-color:transparent;">T</div>
     </div>`;
   document.querySelectorAll('.LCard[data-lk]').forEach(el=>{
     el.onclick=()=>{ activeLoc=el.dataset.lk; showCheckTypeMenu(); };
   });
+  document.getElementById('testTrigger').onclick=handleTestTap;
+}
+
+function handleTestTap(){
+  testTapCount++;
+  clearTimeout(testTapTimer);
+  testTapTimer=setTimeout(()=>{ testTapCount=0; }, 2000);
+  if(testTapCount>=6){
+    testTapCount=0;
+    testMode=!testMode;
+    showModal(testMode?'Test Mode ON':'Test Mode OFF',
+      testMode ? 'Nothing you submit from here on will be saved to the database. Tap the T six times again to turn this off.' : 'Submissions will now save normally.',
+      [{l:'OK',c:'B-red',fn:()=>{ closeModal(); showHome(); }}]);
+  }
 }
 
 // ─── CHECKOUT / RETURN MENU ──────────────────────────────────────────────────
@@ -642,8 +661,10 @@ async function submitRecord(extra){
   };
 
   try{
-    const { error } = await sb.from(TABLE).insert(record);
-    if(error) throw error;
+    if(!testMode){
+      const { error } = await sb.from(TABLE).insert(record);
+      if(error) throw error;
+    }
     showSuccess();
   }catch(e){
     showModal('Save failed', 'This record could not be saved: '+(e.message||'unknown error')+'. Please try again.', [{l:'OK',c:'B-red',fn:()=>{ closeModal(); showChecklist(); }}]);
@@ -655,7 +676,7 @@ function showSuccess(){
     <div class="Success">
       <div class="Success-emoji">✅</div>
       <div class="Success-title">${checkType==='checkout'?'Checkout':'Return'} Submitted</div>
-      <div class="Success-sub">Truck ${setup.truck} · ${setup.driver} · ${setup.date}</div>
+      <div class="Success-sub">Truck ${setup.truck} · ${setup.driver} · ${setup.date}${testMode?' · (test — not saved)':''}</div>
       <button class="B B-red B-lg" id="bDone" style="margin-top:12px;">Done</button>
     </div>`;
   document.getElementById('bDone').onclick=showHome;
