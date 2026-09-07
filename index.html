@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '4.3';
+const APP_VERSION = '4.4';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -283,46 +283,77 @@ function logTypeLabel(r){
 
 function yn(v){ if(v===true) return 'Yes'; if(v===false) return 'No'; return '—'; }
 
+// good=true -> green (expected/OK answer), good=false -> red (flag), good=null -> neutral
+function statRow(label, value, good){
+  const color = good===true ? '#1B6B3A' : good===false ? '#C8102E' : '#111';
+  const weight = good===null ? '600' : '700';
+  return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #eee;">
+    <div style="font-weight:600;color:#777;font-size:12px;">${label}</div>
+    <div style="text-align:right;color:${color};font-weight:${weight};font-size:13px;max-width:60%;">${value}</div>
+  </div>`;
+}
+
+function section(title, rowsHtml){
+  return `<div style="margin-bottom:16px;">
+    <div style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">${title}</div>
+    ${rowsHtml}
+  </div>`;
+}
+
 function showLogDetail(r){
-  const rows = [];
-  rows.push(['Type', logTypeLabel(r)]);
-  rows.push(['Driver', r.driver_name]);
-  rows.push(['Date', r.check_date]);
-  rows.push(['Truck', r.truck_number]);
+  let body = '';
+
+  body += section('Summary',
+    statRow('Type', logTypeLabel(r), null) +
+    statRow('Driver', r.driver_name, null) +
+    statRow('Date', r.check_date, null) +
+    statRow('Truck', r.truck_number, null)
+  );
+
   if(r.gas_run){
-    rows.push(['Starting Mileage', r.mileage_start ?? '—']);
-    rows.push(['Ending Mileage', r.mileage_end ?? '—']);
-  } else {
-    rows.push(['Mileage', r.mileage ?? '—']);
-    if(r.check_type==='checkout'){
-      rows.push(['Hotbox On (Checkout)', yn(r.hotbox_on_checkout)]);
-      rows.push(['Fuel Level', r.fuel_level || '—']);
-      rows.push(['Credit Card Used', yn(r.credit_card_used)]);
-      rows.push(['Garbage Present', yn(r.garbage_present)]);
-      if(r.garbage_present) rows.push(['Garbage Location', r.garbage_location || '—']);
-      rows.push(['Items Present', yn(r.items_present)]);
-      if(r.items_present) rows.push(['Item Detail', r.items_detail || '—']);
-      rows.push(['Acknowledged Responsibility', yn(r.acknowledged)]);
-    } else {
-      rows.push(['No Garbage Confirmed', yn(r.no_garbage_confirmed)]);
-      if(r.no_garbage_confirmed===false) rows.push(['Garbage/Items Notes', r.garbage_notes || '—']);
-      rows.push(['Hotbox On (Return)', yn(r.hotbox_on_return)]);
-      rows.push(['Parked Correctly', yn(r.parked_correctly)]);
-      if(r.parked_correctly===false) rows.push(['Manager Approval', r.parking_exception_manager || '—']);
-    }
-    rows.push(['Damage Found', yn(r.damage_found)]);
-    if(r.damage_found) rows.push(['Damage Notes', r.damage_notes || '—']);
-    rows.push(['Push Cart', yn(r.push_cart)]);
-    rows.push(['Shelves', yn(r.shelves)]);
+    body += section('Gas Run',
+      statRow('Starting Mileage', r.mileage_start ?? '—', null) +
+      statRow('Ending Mileage', r.mileage_end ?? '—', null)
+    );
+    showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
+    return;
   }
 
-  const body = `<div style="display:flex;flex-direction:column;gap:8px;">${rows.map(([k,v])=>`
-    <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #eee;padding-bottom:6px;">
-      <div style="font-weight:700;color:#777;font-size:12px;">${k}</div>
-      <div style="text-align:right;color:#111;font-size:13px;max-width:60%;">${v}</div>
-    </div>`).join('')}</div>`;
+  body += section('Mileage', statRow('Mileage', r.mileage ?? '—', null));
 
-  showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, body, [{l:'Close',c:'B-red',fn:closeModal}], true);
+  if(r.check_type==='checkout'){
+    body += section('Hotbox &amp; Fuel',
+      statRow('Hotbox On', yn(r.hotbox_on_checkout), r.hotbox_on_checkout===true) +
+      statRow('Fuel Level', r.fuel_level || '—', r.fuel_level!=='Less than 1/4 full') +
+      statRow('Credit Card Used (fill-up)', yn(r.credit_card_used), null)
+    );
+    body += section('Garbage &amp; Items',
+      statRow('Garbage Present', yn(r.garbage_present), r.garbage_present===false) +
+      (r.garbage_present ? statRow('Garbage Location', r.garbage_location || '—', false) : '') +
+      statRow('Items Present', yn(r.items_present), r.items_present===false) +
+      (r.items_present ? statRow('Item Detail', r.items_detail || '—', false) : '')
+    );
+    body += section('Acknowledgment', statRow('Acknowledged Responsibility', yn(r.acknowledged), r.acknowledged===true));
+  } else {
+    body += section('Hotbox &amp; Cleanliness',
+      statRow('Hotbox On', yn(r.hotbox_on_return), r.hotbox_on_return===true) +
+      statRow('No Garbage Confirmed', yn(r.no_garbage_confirmed), r.no_garbage_confirmed===true) +
+      (r.no_garbage_confirmed===false ? statRow('Garbage/Items Notes', r.garbage_notes || '—', false) : '')
+    );
+    body += section('Parking',
+      statRow('Parked Correctly', yn(r.parked_correctly), r.parked_correctly===true) +
+      (r.parked_correctly===false ? statRow('Manager Approval', r.parking_exception_manager || '—', false) : '')
+    );
+  }
+
+  body += section('Inspection',
+    statRow('Damage Found', yn(r.damage_found), r.damage_found===false) +
+    (r.damage_found ? statRow('Damage Notes', r.damage_notes || '—', false) : '') +
+    statRow('Push Cart', yn(r.push_cart), r.push_cart===true) +
+    statRow('Shelves', yn(r.shelves), r.shelves===true)
+  );
+
+  showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
 }
 
 // ─── SETUP (driver / date / truck) ───────────────────────────────────────────
