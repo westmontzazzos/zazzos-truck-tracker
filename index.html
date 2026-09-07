@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '3.1';
+const APP_VERSION = '4.0';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -219,10 +219,110 @@ function showCheckTypeMenu(){
         <div class="MenuTile-emoji">🔁</div>
         <div><div class="MenuTile-title">Return Truck</div><div class="MenuTile-sub">Ending your shift</div></div>
       </div>
+      <div class="MenuTile" id="bLog">
+        <div class="MenuTile-emoji">📋</div>
+        <div><div class="MenuTile-title">Truck Log</div><div class="MenuTile-sub">History of all checkouts &amp; returns</div></div>
+      </div>
     </div>`;
   document.getElementById('bHome').onclick=showHome;
   document.getElementById('bCheckout').onclick=()=>{ checkType='checkout'; showSetup(); };
   document.getElementById('bReturn').onclick=()=>{ checkType='return'; showSetup(); };
+  document.getElementById('bLog').onclick=showTruckLog;
+}
+
+// ─── TRUCK LOG ───────────────────────────────────────────────────────────────
+async function showTruckLog(){
+  const loc = LOCATIONS[activeLoc];
+  showLoading();
+  let rows = [];
+  let loadError = false;
+  try{
+    const { data, error } = await sb.from(TABLE)
+      .select('*')
+      .eq('location', activeLoc)
+      .order('check_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if(error) throw error;
+    rows = data || [];
+  }catch(e){
+    loadError = true;
+  }
+
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name} — Truck Log</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      ${loadError ? `
+        <div class="Block"><div class="Field-hint" style="color:#C8102E;">Could not load the log. Please try again.</div></div>
+      ` : rows.length===0 ? `
+        <div class="Block"><div class="Field-hint">No records yet for ${loc.name}.</div></div>
+      ` : rows.map((r,i)=>`
+        <div class="Block" data-logrow="${i}" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div>
+            <div style="font-weight:700;font-size:14px;color:#111;">${r.check_date} · Truck ${r.truck_number}</div>
+            <div style="font-size:12px;color:#777;margin-top:2px;">${r.driver_name} — ${logTypeLabel(r)}</div>
+          </div>
+          <div style="color:#C8102E;font-size:18px;">›</div>
+        </div>
+      `).join('')}
+    </div>`;
+
+  document.getElementById('bBack').onclick=showCheckTypeMenu;
+  rows.forEach((r,i)=>{
+    const el=document.querySelector(`[data-logrow="${i}"]`);
+    if(el) el.onclick=()=>showLogDetail(r);
+  });
+}
+
+function logTypeLabel(r){
+  if(r.gas_run) return 'Gas Run';
+  return r.check_type==='checkout' ? 'Checkout' : 'Return';
+}
+
+function yn(v){ if(v===true) return 'Yes'; if(v===false) return 'No'; return '—'; }
+
+function showLogDetail(r){
+  const rows = [];
+  rows.push(['Type', logTypeLabel(r)]);
+  rows.push(['Driver', r.driver_name]);
+  rows.push(['Date', r.check_date]);
+  rows.push(['Truck', r.truck_number]);
+  if(r.gas_run){
+    rows.push(['Starting Mileage', r.mileage_start ?? '—']);
+    rows.push(['Ending Mileage', r.mileage_end ?? '—']);
+  } else {
+    rows.push(['Mileage', r.mileage ?? '—']);
+    if(r.check_type==='checkout'){
+      rows.push(['Warmers On', yn(r.warmers_on)]);
+      rows.push(['Fuel Level', r.fuel_level || '—']);
+      rows.push(['Credit Card Used', yn(r.credit_card_used)]);
+      rows.push(['Garbage Present', yn(r.garbage_present)]);
+      if(r.garbage_present) rows.push(['Garbage Location', r.garbage_location || '—']);
+      rows.push(['Items Present', yn(r.items_present)]);
+      if(r.items_present) rows.push(['Item Detail', r.items_detail || '—']);
+      rows.push(['Acknowledged Responsibility', yn(r.acknowledged)]);
+    } else {
+      rows.push(['No Garbage Confirmed', yn(r.no_garbage_confirmed)]);
+      if(r.no_garbage_confirmed===false) rows.push(['Garbage/Items Notes', r.garbage_notes || '—']);
+      rows.push(['Heater Off Confirmed', yn(r.heater_off_confirmed)]);
+      rows.push(['Parked Correctly', yn(r.parked_correctly)]);
+      if(r.parked_correctly===false) rows.push(['Manager Approval', r.parking_exception_manager || '—']);
+    }
+    rows.push(['Damage Found', yn(r.damage_found)]);
+    if(r.damage_found) rows.push(['Damage Notes', r.damage_notes || '—']);
+    rows.push(['Push Cart', yn(r.push_cart)]);
+    rows.push(['Shelves', yn(r.shelves)]);
+  }
+
+  const body = `<div style="display:flex;flex-direction:column;gap:8px;">${rows.map(([k,v])=>`
+    <div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #eee;padding-bottom:6px;">
+      <div style="font-weight:700;color:#777;font-size:12px;">${k}</div>
+      <div style="text-align:right;color:#111;font-size:13px;max-width:60%;">${v}</div>
+    </div>`).join('')}</div>`;
+
+  showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, body, [{l:'Close',c:'B-red',fn:closeModal}], true);
 }
 
 // ─── SETUP (driver / date / truck) ───────────────────────────────────────────
