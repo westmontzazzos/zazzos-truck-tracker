@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '4.2';
+const APP_VERSION = '4.3';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -295,7 +295,7 @@ function showLogDetail(r){
   } else {
     rows.push(['Mileage', r.mileage ?? '—']);
     if(r.check_type==='checkout'){
-      rows.push(['Warmers On', yn(r.warmers_on)]);
+      rows.push(['Hotbox On (Checkout)', yn(r.hotbox_on_checkout)]);
       rows.push(['Fuel Level', r.fuel_level || '—']);
       rows.push(['Credit Card Used', yn(r.credit_card_used)]);
       rows.push(['Garbage Present', yn(r.garbage_present)]);
@@ -306,7 +306,7 @@ function showLogDetail(r){
     } else {
       rows.push(['No Garbage Confirmed', yn(r.no_garbage_confirmed)]);
       if(r.no_garbage_confirmed===false) rows.push(['Garbage/Items Notes', r.garbage_notes || '—']);
-      rows.push(['Heater Off Confirmed', yn(r.heater_off_confirmed)]);
+      rows.push(['Hotbox On (Return)', yn(r.hotbox_on_return)]);
       rows.push(['Parked Correctly', yn(r.parked_correctly)]);
       if(r.parked_correctly===false) rows.push(['Manager Approval', r.parking_exception_manager || '—']);
     }
@@ -485,7 +485,7 @@ function showAcknowledgment(){
     <ul>
       <li>Recording accurate mileage at checkout and return</li>
       <li>Ensuring the fuel tank is at least 3/4 full — if it's below 1/4, filling up using the company credit card before returning</li>
-      <li>Keeping the heater on while the truck is in use, and confirming it's off when returned</li>
+      <li>Keeping the hotbox on at all times — both when the truck is taken out and when it's returned</li>
       <li>Parking the truck back where I found it, unless a manager has instructed otherwise</li>
     </ul>`,
     [
@@ -581,12 +581,12 @@ function showChecklist(){
 
       ${isCheckout ? `
       <div class="Block">
-        <div class="Block-title">Warmers</div>
+        <div class="Block-title">Hotbox</div>
         <div class="Field">
-          <label>Are the warmers on in the back of the truck?</label>
+          <label>Confirm the hotbox is on</label>
           <div class="YN">
-            <button class="YN-btn" data-yn="warmersOn" data-val="yes">Yes</button>
-            <button class="YN-btn" data-yn="warmersOn" data-val="no">No</button>
+            <button class="YN-btn" data-yn="hotboxOnCheckout" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="hotboxOnCheckout" data-val="no">No</button>
           </div>
         </div>
       </div>
@@ -624,12 +624,12 @@ function showChecklist(){
       </div>
 
       <div class="Block">
-        <div class="Block-title">Heater</div>
+        <div class="Block-title">Hotbox</div>
         <div class="Field">
-          <label>Confirm the heater has been turned off</label>
+          <label>Confirm the hotbox is on</label>
           <div class="YN">
-            <button class="YN-btn" data-yn="heaterOff" data-val="yes">Confirmed off</button>
-            <button class="YN-btn" data-yn="heaterOff" data-val="no">Still on</button>
+            <button class="YN-btn" data-yn="hotboxOnReturn" data-val="yes">Yes — on</button>
+            <button class="YN-btn" data-yn="hotboxOnReturn" data-val="no">No — off</button>
           </div>
         </div>
       </div>
@@ -647,7 +647,7 @@ function showChecklist(){
         </div>
         <div class="Field" id="garbageLocWrap" style="display:none;">
           <label>Where was the garbage located?</label>
-          <textarea id="fGarbageLoc" placeholder="e.g. floor of cab, back near warmers">${form.garbageLocation||''}</textarea>
+          <textarea id="fGarbageLoc" placeholder="e.g. floor of cab, back near hotbox">${form.garbageLocation||''}</textarea>
         </div>
         <div class="Field">
           <label>Are there any items left in the truck?</label>
@@ -688,7 +688,7 @@ function showChecklist(){
           </div>
         </div>
         <div class="Field">
-          <label>Shelves in truck${isCheckout?' / heater':''}?</label>
+          <label>Shelves in truck${isCheckout?' / hotbox':''}?</label>
           <div class="YN">
             <button class="YN-btn" data-yn="shelves" data-val="yes">Yes</button>
             <button class="YN-btn" data-yn="shelves" data-val="no">No</button>
@@ -791,16 +791,16 @@ function showChecklist(){
 
 function requiredFields(isCheckout){
   const req = ['mileage','damage','pushCart','shelves'];
-  if(isCheckout){ req.push('warmersOn','fuelLevel','garbagePresent','itemsPresent'); }
-  else { req.push('noGarbage','heaterOff','parkedCorrectly'); }
+  if(isCheckout){ req.push('hotboxOnCheckout','fuelLevel','garbagePresent','itemsPresent'); }
+  else { req.push('noGarbage','hotboxOnReturn','parkedCorrectly'); }
   return req;
 }
 
 function validateChecklist(isCheckout){
   const labels = {
     mileage:'Mileage', damage:'Damage inspection', pushCart:'Push cart', shelves:'Shelves',
-    warmersOn:'Warmers', fuelLevel:'Fuel level', garbagePresent:'Garbage check', itemsPresent:'Items check',
-    noGarbage:'Garbage check', heaterOff:'Heater confirmation', parkedCorrectly:'Parking confirmation',
+    hotboxOnCheckout:'Hotbox confirmation', fuelLevel:'Fuel level', garbagePresent:'Garbage check', itemsPresent:'Items check',
+    noGarbage:'Garbage check', hotboxOnReturn:'Hotbox confirmation', parkedCorrectly:'Parking confirmation',
   };
   const missing=[];
   requiredFields(isCheckout).forEach(f=>{ if(!form[f]) missing.push(labels[f]); });
@@ -837,7 +837,7 @@ async function submitRecord(extra){
       mileage_end: form.mileageEnd ? Number(form.mileageEnd) : null,
     } : {
       mileage: form.mileage ? Number(form.mileage) : null,
-      warmers_on: form.warmersOn ? form.warmersOn==='yes' : null,
+      hotbox_on_checkout: form.hotboxOnCheckout ? form.hotboxOnCheckout==='yes' : null,
       fuel_level: form.fuelLevel || null,
       credit_card_used: !!form.creditCardUsed,
       garbage_present: form.garbagePresent ? form.garbagePresent==='yes' : null,
@@ -846,7 +846,7 @@ async function submitRecord(extra){
       items_detail: form.itemsDetail || null,
       garbage_notes: form.garbageReturnNotes || null,
       no_garbage_confirmed: form.noGarbage ? form.noGarbage==='yes' : null,
-      heater_off_confirmed: form.heaterOff ? form.heaterOff==='yes' : null,
+      hotbox_on_return: form.hotboxOnReturn ? form.hotboxOnReturn==='yes' : null,
       damage_found: form.damage ? form.damage==='yes' : null,
       damage_notes: form.damageNotes || null,
       push_cart: form.pushCart ? form.pushCart==='yes' : null,
