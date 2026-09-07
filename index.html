@@ -117,7 +117,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -424,8 +424,26 @@ function showChecklist(){
       <div class="Block">
         <div class="Block-title">Garbage / Items Left in Truck</div>
         <div class="Field">
-          <label>List any garbage or items found in the truck (leave blank if none)</label>
-          <textarea id="fGarbage" placeholder="e.g. none / empty cups on floor">${form.garbageNotes||''}</textarea>
+          <label>Is there any garbage in the truck?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="garbagePresent" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="garbagePresent" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="Field" id="garbageLocWrap" style="display:none;">
+          <label>Where was the garbage located?</label>
+          <textarea id="fGarbageLoc" placeholder="e.g. floor of cab, back near warmers">${form.garbageLocation||''}</textarea>
+        </div>
+        <div class="Field">
+          <label>Are there any items left in the truck?</label>
+          <div class="YN">
+            <button class="YN-btn" data-yn="itemsPresent" data-val="yes">Yes</button>
+            <button class="YN-btn" data-yn="itemsPresent" data-val="no">No</button>
+          </div>
+        </div>
+        <div class="Field" id="itemsDetailWrap" style="display:none;">
+          <label>What item(s), and where were they located?</label>
+          <textarea id="fItemsDetail" placeholder="e.g. clipboard, on passenger seat">${form.itemsDetail||''}</textarea>
         </div>
       </div>
       ` : ``}
@@ -502,6 +520,8 @@ function showChecklist(){
       if(key==='damage'){ document.getElementById('damageDetailWrap').style.display = val==='yes' ? 'block' : 'none'; }
       if(key==='noGarbage'){ document.getElementById('garbageDetailWrap').style.display = val==='no' ? 'block' : 'none'; }
       if(key==='parkedCorrectly'){ document.getElementById('parkExceptionWrap').style.display = val==='no' ? 'block' : 'none'; }
+      if(key==='garbagePresent'){ document.getElementById('garbageLocWrap').style.display = val==='yes' ? 'block' : 'none'; }
+      if(key==='itemsPresent'){ document.getElementById('itemsDetailWrap').style.display = val==='yes' ? 'block' : 'none'; }
       updateProgress();
     };
   });
@@ -532,9 +552,12 @@ function showChecklist(){
   if(form.damage==='yes') document.getElementById('damageDetailWrap').style.display='block';
   if(form.noGarbage==='no') document.getElementById('garbageDetailWrap') && (document.getElementById('garbageDetailWrap').style.display='block');
   if(form.parkedCorrectly==='no') document.getElementById('parkExceptionWrap') && (document.getElementById('parkExceptionWrap').style.display='block');
+  if(form.garbagePresent==='yes') document.getElementById('garbageLocWrap') && (document.getElementById('garbageLocWrap').style.display='block');
+  if(form.itemsPresent==='yes') document.getElementById('itemsDetailWrap') && (document.getElementById('itemsDetailWrap').style.display='block');
 
   document.getElementById('fMileage').oninput=e=>{ form.mileage=e.target.value; };
-  const fGarbage=document.getElementById('fGarbage'); if(fGarbage) fGarbage.oninput=e=>{ form.garbageNotes=e.target.value; };
+  const fGarbageLoc=document.getElementById('fGarbageLoc'); if(fGarbageLoc) fGarbageLoc.oninput=e=>{ form.garbageLocation=e.target.value; };
+  const fItemsDetail=document.getElementById('fItemsDetail'); if(fItemsDetail) fItemsDetail.oninput=e=>{ form.itemsDetail=e.target.value; };
   const fGarbageReturn=document.getElementById('fGarbageReturn'); if(fGarbageReturn) fGarbageReturn.oninput=e=>{ form.garbageReturnNotes=e.target.value; };
   const fDamageNotes=document.getElementById('fDamageNotes'); if(fDamageNotes) fDamageNotes.oninput=e=>{ form.damageNotes=e.target.value; };
   const fParkManager=document.getElementById('fParkManager'); if(fParkManager) fParkManager.oninput=e=>{ form.parkManager=e.target.value; };
@@ -553,7 +576,7 @@ function showChecklist(){
 
 function requiredFields(isCheckout){
   const req = ['mileage','damage','pushCart','shelves'];
-  if(isCheckout){ req.push('warmersOn','fuelLevel'); }
+  if(isCheckout){ req.push('warmersOn','fuelLevel','garbagePresent','itemsPresent'); }
   else { req.push('noGarbage','heaterOff','parkedCorrectly'); }
   return req;
 }
@@ -561,12 +584,14 @@ function requiredFields(isCheckout){
 function validateChecklist(isCheckout){
   const labels = {
     mileage:'Mileage', damage:'Damage inspection', pushCart:'Push cart', shelves:'Shelves',
-    warmersOn:'Warmers', fuelLevel:'Fuel level',
+    warmersOn:'Warmers', fuelLevel:'Fuel level', garbagePresent:'Garbage check', itemsPresent:'Items check',
     noGarbage:'Garbage check', heaterOff:'Heater confirmation', parkedCorrectly:'Parking confirmation',
   };
   const missing=[];
   requiredFields(isCheckout).forEach(f=>{ if(!form[f]) missing.push(labels[f]); });
   if(isCheckout && form.fuelLevel==='Less than 1/4 full' && !form.creditCardUsed) missing.push('Credit card fill-up confirmation');
+  if(isCheckout && form.garbagePresent==='yes' && !form.garbageLocation) missing.push('Garbage location');
+  if(isCheckout && form.itemsPresent==='yes' && !form.itemsDetail) missing.push('Item description/location');
   if(form.damage==='yes' && !form.damageNotes) missing.push('Damage description');
   if(!isCheckout && form.noGarbage==='no' && !form.garbageReturnNotes) missing.push('Garbage/items description');
   if(!isCheckout && form.parkedCorrectly==='no' && !form.parkManager) missing.push('Manager name for parking exception');
@@ -600,7 +625,11 @@ async function submitRecord(extra){
       warmers_on: form.warmersOn ? form.warmersOn==='yes' : null,
       fuel_level: form.fuelLevel || null,
       credit_card_used: !!form.creditCardUsed,
-      garbage_notes: form.garbageNotes || form.garbageReturnNotes || null,
+      garbage_present: form.garbagePresent ? form.garbagePresent==='yes' : null,
+      garbage_location: form.garbageLocation || null,
+      items_present: form.itemsPresent ? form.itemsPresent==='yes' : null,
+      items_detail: form.itemsDetail || null,
+      garbage_notes: form.garbageReturnNotes || null,
       no_garbage_confirmed: form.noGarbage ? form.noGarbage==='yes' : null,
       heater_off_confirmed: form.heaterOff ? form.heaterOff==='yes' : null,
       damage_found: form.damage ? form.damage==='yes' : null,
