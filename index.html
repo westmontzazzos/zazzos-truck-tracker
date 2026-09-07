@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.2';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -328,22 +328,23 @@ function showLogDetail(r){
 // ─── SETUP (driver / date / truck) ───────────────────────────────────────────
 // Determines which trucks are currently checked out for a location by
 // replaying check_type events in order. A full checkout (gas_run false)
-// marks a truck 'out'; a return marks it 'in'. Gas runs are a round trip
-// in a single submission and don't change state.
+// marks a truck 'out' and records who checked it out; a return marks it
+// 'in'. Gas runs are a round trip in a single submission and don't change
+// state. Returns a map: { truckNumber: driverNameWhoCheckedItOut }.
 async function getOutTrucks(location){
   try{
     const { data, error } = await sb.from(TABLE)
-      .select('truck_number,check_type,gas_run,created_at')
+      .select('truck_number,check_type,gas_run,driver_name,created_at')
       .eq('location', location)
       .order('created_at', { ascending: true });
     if(error || !data) return null;
     const state = {};
     data.forEach(row=>{
       if(row.gas_run) return;
-      if(row.check_type==='checkout') state[row.truck_number]=true;
-      else if(row.check_type==='return') state[row.truck_number]=false;
+      if(row.check_type==='checkout') state[row.truck_number]=row.driver_name;
+      else if(row.check_type==='return') delete state[row.truck_number];
     });
-    return Object.keys(state).filter(t=>state[t]);
+    return state;
   }catch(e){
     return null;
   }
@@ -411,7 +412,8 @@ function showSetup(){
 async function showReturnTruckPicker(){
   const loc = LOCATIONS[activeLoc];
   showLoading();
-  const outTrucks = await getOutTrucks(activeLoc) || [];
+  const outMap = await getOutTrucks(activeLoc) || {};
+  const outTrucks = Object.keys(outMap);
 
   app.innerHTML = `
     <header class="H">
@@ -425,7 +427,7 @@ async function showReturnTruckPicker(){
       ` : outTrucks.map(t=>`
         <div class="MenuTile" data-truck="${t}" style="margin-bottom:12px;">
           <div class="MenuTile-emoji">🚚</div>
-          <div><div class="MenuTile-title">Truck ${t}</div><div class="MenuTile-sub">Tap to return this truck</div></div>
+          <div><div class="MenuTile-title">Truck ${t}</div><div class="MenuTile-sub">Checked out by ${outMap[t]}</div></div>
         </div>
       `).join('')}
     </div>`;
@@ -433,13 +435,12 @@ async function showReturnTruckPicker(){
   document.getElementById('bBack').onclick=showCheckTypeMenu;
   outTrucks.forEach(t=>{
     const el=document.querySelector(`[data-truck="${t}"]`);
-    if(el) el.onclick=()=>{ setup.truck=t; showReturnDriverDate(); };
+    if(el) el.onclick=()=>{ setup.truck=t; setup.driver=outMap[t]; showReturnDriverDate(); };
   });
 }
 
 function showReturnDriverDate(){
   const loc = LOCATIONS[activeLoc];
-  const drivers = DRIVERS[activeLoc];
   setup.date = setup.date || todayStr();
 
   app.innerHTML = `
@@ -452,10 +453,8 @@ function showReturnDriverDate(){
         <div class="Block-title">Return Truck ${setup.truck}</div>
         <div class="Field">
           <label>Driver</label>
-          <select id="fDriver">
-            <option value="">Select driver…</option>
-            ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
-          </select>
+          <div style="min-height:44px;display:flex;align-items:center;padding:0 12px;border:2px solid #E2E2E2;border-radius:8px;font-size:15px;font-weight:600;color:#111;background:#F7F7F7;">${setup.driver}</div>
+          <div class="Field-hint">Auto-filled from the checkout record — this is who took the truck out.</div>
         </div>
         <div class="Field">
           <label>Date</label>
@@ -470,10 +469,9 @@ function showReturnDriverDate(){
 
   document.getElementById('bBack').onclick=showReturnTruckPicker;
   document.getElementById('bContinue').onclick=()=>{
-    setup.driver=document.getElementById('fDriver').value;
     setup.date=document.getElementById('fDate').value;
-    if(!setup.driver || !setup.date){
-      showModal('Missing info','Please select a driver and date before continuing.',[{l:'OK',c:'B-red',fn:closeModal}]);
+    if(!setup.date){
+      showModal('Missing info','Please select a date before continuing.',[{l:'OK',c:'B-red',fn:closeModal}]);
       return;
     }
     showChecklist();
