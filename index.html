@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '4.0';
+const APP_VERSION = '4.1';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -226,7 +226,7 @@ function showCheckTypeMenu(){
     </div>`;
   document.getElementById('bHome').onclick=showHome;
   document.getElementById('bCheckout').onclick=()=>{ checkType='checkout'; showSetup(); };
-  document.getElementById('bReturn').onclick=()=>{ checkType='return'; showSetup(); };
+  document.getElementById('bReturn').onclick=()=>{ checkType='return'; showReturnTruckPicker(); };
   document.getElementById('bLog').onclick=showTruckLog;
 }
 
@@ -349,45 +349,11 @@ async function getOutTrucks(location){
   }
 }
 
-async function showSetup(){
+function showSetup(){
   const loc = LOCATIONS[activeLoc];
   const drivers = DRIVERS[activeLoc];
-  const allTrucks = TRUCKS[activeLoc];
+  const trucks = TRUCKS[activeLoc];
   setup.date = setup.date || todayStr();
-  const isReturn = checkType==='return';
-
-  let trucks = allTrucks;
-  if(isReturn){
-    showLoading();
-    const outTrucks = await getOutTrucks(activeLoc);
-    trucks = outTrucks || [];
-  }
-
-  const truckField = `
-    <div class="Field">
-      <label>Truck Number</label>
-      <select id="fTruck" ${trucks.length===0?'disabled':''}>
-        ${trucks.length===0
-          ? `<option value="">No trucks currently checked out</option>`
-          : `<option value="">Select truck…</option>` + trucks.map(t=>`<option value="${t}" ${setup.truck===t?'selected':''}>Truck ${t}</option>`).join('')
-        }
-      </select>
-    </div>`;
-
-  const driverField = `
-    <div class="Field">
-      <label>Driver</label>
-      <select id="fDriver">
-        <option value="">Select driver…</option>
-        ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
-      </select>
-    </div>`;
-
-  const dateField = `
-    <div class="Field">
-      <label>Date</label>
-      <input type="date" id="fDate" value="${setup.date}">
-    </div>`;
 
   app.innerHTML = `
     <header class="H">
@@ -396,13 +362,30 @@ async function showSetup(){
     </header>
     <div class="Page" style="padding-top:16px;">
       <div class="Block">
-        <div class="Block-title">${checkType==='checkout'?'Checkout Truck':'Return Truck'}</div>
-        ${isReturn ? truckField + driverField + dateField : driverField + dateField + truckField}
+        <div class="Block-title">Checkout Truck</div>
+        <div class="Field">
+          <label>Driver</label>
+          <select id="fDriver">
+            <option value="">Select driver…</option>
+            ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="Field">
+          <label>Date</label>
+          <input type="date" id="fDate" value="${setup.date}">
+        </div>
+        <div class="Field">
+          <label>Truck Number</label>
+          <select id="fTruck">
+            <option value="">Select truck…</option>
+            ${trucks.map(t=>`<option value="${t}" ${setup.truck===t?'selected':''}>Truck ${t}</option>`).join('')}
+          </select>
+        </div>
       </div>
     </div>
     <div class="Footer">
       <div class="Footer-prog">Step 1 of 2</div>
-      <button class="Fbtn Fbtn-next" id="bContinue" ${trucks.length===0?'disabled':''}>Continue →</button>
+      <button class="Fbtn Fbtn-next" id="bContinue">Continue →</button>
     </div>`;
 
   document.getElementById('bBack').onclick=showCheckTypeMenu;
@@ -416,11 +399,84 @@ async function showSetup(){
       ]);
       return;
     }
-    if(checkType==='checkout' && !acknowledged){
+    if(!acknowledged){
       showAcknowledgment();
     } else {
       showGasRunQuestion();
     }
+  };
+}
+
+// ─── RETURN FLOW: pick a checked-out truck first, nothing else on screen ────
+async function showReturnTruckPicker(){
+  const loc = LOCATIONS[activeLoc];
+  showLoading();
+  const outTrucks = await getOutTrucks(activeLoc) || [];
+
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      <div class="SectionLabel">Select the truck being returned</div>
+      ${outTrucks.length===0 ? `
+        <div class="Block"><div class="Field-hint">No trucks are currently checked out.</div></div>
+      ` : outTrucks.map(t=>`
+        <div class="MenuTile" data-truck="${t}" style="margin-bottom:12px;">
+          <div class="MenuTile-emoji">🚚</div>
+          <div><div class="MenuTile-title">Truck ${t}</div><div class="MenuTile-sub">Tap to return this truck</div></div>
+        </div>
+      `).join('')}
+    </div>`;
+
+  document.getElementById('bBack').onclick=showCheckTypeMenu;
+  outTrucks.forEach(t=>{
+    const el=document.querySelector(`[data-truck="${t}"]`);
+    if(el) el.onclick=()=>{ setup.truck=t; showReturnDriverDate(); };
+  });
+}
+
+function showReturnDriverDate(){
+  const loc = LOCATIONS[activeLoc];
+  const drivers = DRIVERS[activeLoc];
+  setup.date = setup.date || todayStr();
+
+  app.innerHTML = `
+    <header class="H">
+      <div class="H-logo">${loc.name}</div>
+      <div class="H-right"><button class="B B-ghost" id="bBack">← Back</button></div>
+    </header>
+    <div class="Page" style="padding-top:16px;">
+      <div class="Block">
+        <div class="Block-title">Return Truck ${setup.truck}</div>
+        <div class="Field">
+          <label>Driver</label>
+          <select id="fDriver">
+            <option value="">Select driver…</option>
+            ${drivers.map(d=>`<option value="${d}" ${setup.driver===d?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="Field">
+          <label>Date</label>
+          <input type="date" id="fDate" value="${setup.date}">
+        </div>
+      </div>
+    </div>
+    <div class="Footer">
+      <div class="Footer-prog">Step 1 of 2</div>
+      <button class="Fbtn Fbtn-next" id="bContinue">Continue →</button>
+    </div>`;
+
+  document.getElementById('bBack').onclick=showReturnTruckPicker;
+  document.getElementById('bContinue').onclick=()=>{
+    setup.driver=document.getElementById('fDriver').value;
+    setup.date=document.getElementById('fDate').value;
+    if(!setup.driver || !setup.date){
+      showModal('Missing info','Please select a driver and date before continuing.',[{l:'OK',c:'B-red',fn:closeModal}]);
+      return;
+    }
+    showChecklist();
   };
 }
 
@@ -666,7 +722,7 @@ function showChecklist(){
     </div>`;
 
   document.getElementById('bBack').onclick=()=>{
-    if(isCheckout) showGasRunQuestion(); else showSetup();
+    if(isCheckout) showGasRunQuestion(); else showReturnDriverDate();
   };
 
   // wire up YN buttons
