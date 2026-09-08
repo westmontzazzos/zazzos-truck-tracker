@@ -119,7 +119,7 @@ const TABLE = 'truck_checks';
 
 // Major.Minor — bump the FIRST number for a new feature, the SECOND for a
 // cosmetic/minor change (this is intentionally the reverse of typical semver).
-const APP_VERSION = '4.4';
+const APP_VERSION = '5.0';
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const LOCATIONS = {
@@ -240,13 +240,30 @@ async function showTruckLog(){
     const { data, error } = await sb.from(TABLE)
       .select('*')
       .eq('location', activeLoc)
-      .order('check_date', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
     if(error) throw error;
     rows = data || [];
   }catch(e){
     loadError = true;
   }
+
+  // Pair each checkout with the next return for the same truck. A truck
+  // still out shows with return:null. Gas runs are self-contained and
+  // stay as their own standalone entries.
+  const trips = [];
+  const pending = {}; // truck_number -> pending checkout record
+  rows.forEach(r=>{
+    if(r.gas_run){ trips.push({ gasRun:r }); return; }
+    if(r.check_type==='checkout'){
+      pending[r.truck_number] = r;
+      trips.push({ checkout:r, return:null, _truck:r.truck_number, _open:true });
+    } else if(r.check_type==='return'){
+      const openTrip = [...trips].reverse().find(t=>t._open && t._truck===r.truck_number);
+      if(openTrip){ openTrip.return=r; openTrip._open=false; }
+      else { trips.push({ checkout:null, return:r, _truck:r.truck_number }); }
+    }
+  });
+  trips.reverse(); // newest first
 
   app.innerHTML = `
     <header class="H">
@@ -256,23 +273,26 @@ async function showTruckLog(){
     <div class="Page" style="padding-top:16px;">
       ${loadError ? `
         <div class="Block"><div class="Field-hint" style="color:#C8102E;">Could not load the log. Please try again.</div></div>
-      ` : rows.length===0 ? `
+      ` : trips.length===0 ? `
         <div class="Block"><div class="Field-hint">No records yet for ${loc.name}.</div></div>
-      ` : rows.map((r,i)=>`
+      ` : trips.map((t,i)=>{
+          const main = t.gasRun || t.checkout || t.return;
+          const statusLabel = t.gasRun ? 'Gas Run' : t.checkout && t.return ? 'Checkout + Return' : t.checkout ? 'Checkout — still out' : 'Return (no checkout on file)';
+          return `
         <div class="Block" data-logrow="${i}" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <div>
-            <div style="font-weight:700;font-size:14px;color:#111;">${r.check_date} · Truck ${r.truck_number}</div>
-            <div style="font-size:12px;color:#777;margin-top:2px;">${r.driver_name} — ${logTypeLabel(r)}</div>
+            <div style="font-weight:700;font-size:14px;color:#111;">${main.check_date} · Truck ${main.truck_number}</div>
+            <div style="font-size:12px;color:#777;margin-top:2px;">${main.driver_name} — ${statusLabel}</div>
           </div>
           <div style="color:#C8102E;font-size:18px;">›</div>
-        </div>
-      `).join('')}
+        </div>`;
+        }).join('')}
     </div>`;
 
   document.getElementById('bBack').onclick=showCheckTypeMenu;
-  rows.forEach((r,i)=>{
+  trips.forEach((t,i)=>{
     const el=document.querySelector(`[data-logrow="${i}"]`);
-    if(el) el.onclick=()=>showLogDetail(r);
+    if(el) el.onclick=()=>showLogDetail(t);
   });
 }
 
@@ -300,60 +320,86 @@ function section(title, rowsHtml){
   </div>`;
 }
 
-function showLogDetail(r){
-  let body = '';
-
-  body += section('Summary',
-    statRow('Type', logTypeLabel(r), null) +
-    statRow('Driver', r.driver_name, null) +
-    statRow('Date', r.check_date, null) +
-    statRow('Truck', r.truck_number, null)
+function checkoutDetailHtml(r){
+  let body = section('Mileage', statRow('Mileage', r.mileage ?? '—', null));
+  body += section('Hotbox &amp; Fuel',
+    statRow('Hotbox On', yn(r.hotbox_on_checkout), r.hotbox_on_checkout===true) +
+    statRow('Fuel Level', r.fuel_level || '—', r.fuel_level!=='Less than 1/4 full') +
+    statRow('Credit Card Used (fill-up)', yn(r.credit_card_used), null)
   );
-
-  if(r.gas_run){
-    body += section('Gas Run',
-      statRow('Starting Mileage', r.mileage_start ?? '—', null) +
-      statRow('Ending Mileage', r.mileage_end ?? '—', null)
-    );
-    showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
-    return;
-  }
-
-  body += section('Mileage', statRow('Mileage', r.mileage ?? '—', null));
-
-  if(r.check_type==='checkout'){
-    body += section('Hotbox &amp; Fuel',
-      statRow('Hotbox On', yn(r.hotbox_on_checkout), r.hotbox_on_checkout===true) +
-      statRow('Fuel Level', r.fuel_level || '—', r.fuel_level!=='Less than 1/4 full') +
-      statRow('Credit Card Used (fill-up)', yn(r.credit_card_used), null)
-    );
-    body += section('Garbage &amp; Items',
-      statRow('Garbage Present', yn(r.garbage_present), r.garbage_present===false) +
-      (r.garbage_present ? statRow('Garbage Location', r.garbage_location || '—', false) : '') +
-      statRow('Items Present', yn(r.items_present), r.items_present===false) +
-      (r.items_present ? statRow('Item Detail', r.items_detail || '—', false) : '')
-    );
-    body += section('Acknowledgment', statRow('Acknowledged Responsibility', yn(r.acknowledged), r.acknowledged===true));
-  } else {
-    body += section('Hotbox &amp; Cleanliness',
-      statRow('Hotbox On', yn(r.hotbox_on_return), r.hotbox_on_return===true) +
-      statRow('No Garbage Confirmed', yn(r.no_garbage_confirmed), r.no_garbage_confirmed===true) +
-      (r.no_garbage_confirmed===false ? statRow('Garbage/Items Notes', r.garbage_notes || '—', false) : '')
-    );
-    body += section('Parking',
-      statRow('Parked Correctly', yn(r.parked_correctly), r.parked_correctly===true) +
-      (r.parked_correctly===false ? statRow('Manager Approval', r.parking_exception_manager || '—', false) : '')
-    );
-  }
-
+  body += section('Garbage &amp; Items',
+    statRow('Garbage Present', yn(r.garbage_present), r.garbage_present===false) +
+    (r.garbage_present ? statRow('Garbage Location', r.garbage_location || '—', false) : '') +
+    statRow('Items Present', yn(r.items_present), r.items_present===false) +
+    (r.items_present ? statRow('Item Detail', r.items_detail || '—', false) : '')
+  );
+  body += section('Acknowledgment', statRow('Acknowledged Responsibility', yn(r.acknowledged), r.acknowledged===true));
   body += section('Inspection',
     statRow('Damage Found', yn(r.damage_found), r.damage_found===false) +
     (r.damage_found ? statRow('Damage Notes', r.damage_notes || '—', false) : '') +
     statRow('Push Cart', yn(r.push_cart), r.push_cart===true) +
     statRow('Shelves', yn(r.shelves), r.shelves===true)
   );
+  return body;
+}
 
-  showModal(`${logTypeLabel(r)} — Truck ${r.truck_number}`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
+function returnDetailHtml(r){
+  let body = section('Mileage', statRow('Mileage', r.mileage ?? '—', null));
+  body += section('Hotbox &amp; Cleanliness',
+    statRow('Hotbox On', yn(r.hotbox_on_return), r.hotbox_on_return===true) +
+    statRow('No Garbage Confirmed', yn(r.no_garbage_confirmed), r.no_garbage_confirmed===true) +
+    (r.no_garbage_confirmed===false ? statRow('Garbage/Items Notes', r.garbage_notes || '—', false) : '')
+  );
+  body += section('Parking',
+    statRow('Parked Correctly', yn(r.parked_correctly), r.parked_correctly===true) +
+    (r.parked_correctly===false ? statRow('Manager Approval', r.parking_exception_manager || '—', false) : '')
+  );
+  body += section('Inspection',
+    statRow('Damage Found', yn(r.damage_found), r.damage_found===false) +
+    (r.damage_found ? statRow('Damage Notes', r.damage_notes || '—', false) : '') +
+    statRow('Push Cart', yn(r.push_cart), r.push_cart===true) +
+    statRow('Shelves', yn(r.shelves), r.shelves===true)
+  );
+  return body;
+}
+
+function subhead(label, color){
+  return `<div style="font-family:'Libre Baskerville',Georgia,serif;font-size:15px;font-weight:700;color:${color||'#111'};margin:14px 0 8px;padding-top:14px;border-top:2px solid #eee;">${label}</div>`;
+}
+
+function showLogDetail(t){
+  if(t.gasRun){
+    const r=t.gasRun;
+    const body = section('Summary',
+      statRow('Driver', r.driver_name, null) + statRow('Date', r.check_date, null) + statRow('Truck', r.truck_number, null)
+    ) + section('Gas Run',
+      statRow('Starting Mileage', r.mileage_start ?? '—', null) +
+      statRow('Ending Mileage', r.mileage_end ?? '—', null)
+    );
+    showModal(`Gas Run — Truck ${r.truck_number}`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
+    return;
+  }
+
+  const main = t.checkout || t.return;
+  let body = section('Summary',
+    statRow('Driver', main.driver_name, null) + statRow('Truck', main.truck_number, null)
+  );
+
+  if(t.checkout){
+    body += subhead(`Checkout — ${t.checkout.check_date}`, '#C8102E');
+    body += checkoutDetailHtml(t.checkout);
+  } else {
+    body += subhead('Checkout — no record on file', '#C8102E');
+  }
+
+  if(t.return){
+    body += subhead(`Return — ${t.return.check_date}`, '#1B6B3A');
+    body += returnDetailHtml(t.return);
+  } else {
+    body += subhead('Return — truck still out, not yet returned', '#1B6B3A');
+  }
+
+  showModal(`Truck ${main.truck_number} — Round Trip`, `<div>${body}</div>`, [{l:'Close',c:'B-red',fn:closeModal}], true);
 }
 
 // ─── SETUP (driver / date / truck) ───────────────────────────────────────────
